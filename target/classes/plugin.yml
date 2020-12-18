@@ -1,0 +1,11 @@
+# Run Information
+api-version: "1.16"
+main: com.firecontroller1847.dynmapps.DynmapPS
+depend: [dynmap, PreciousStones]
+softdepend: [SimpleClans]
+
+  # Metadata Information
+name: DynmapPS
+version: 1.0.0-SNAPSHOT
+author: FireController#1847
+website: https://www.visualfiredev.com/
