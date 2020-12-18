@@ -11,11 +11,11 @@ import org.dynmap.DynmapAPI;
 import org.dynmap.markers.AreaMarker;
 import org.dynmap.markers.MarkerAPI;
 import org.dynmap.markers.MarkerSet;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.*;
+import org.locationtech.jts.operation.union.UnaryUnionOp;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class DynmapPS extends JavaPlugin {
@@ -27,7 +27,7 @@ public class DynmapPS extends JavaPlugin {
 
     // Variables
     private MarkerSet markerSet; // The set of markers to use on Dynmap
-    private ArrayList<AreaMarker> markers = new ArrayList<>(); // A cache of AreaMarkers
+    private Thread updateThread; // The thread which loops for rebuilding
 
     // On Enable
     @Override
@@ -56,7 +56,7 @@ public class DynmapPS extends JavaPlugin {
         this.prepareMarkerSet();
 
         // TODO: Actually update the markers...
-        this.updateMarkerSet();
+        this.updateLoop();
 
         // Log Enabled
         this.getLogger().info("Enabled " + this.getName() + "!");
@@ -65,6 +65,10 @@ public class DynmapPS extends JavaPlugin {
     // On Disable
     @Override
     public void onDisable() {
+        if (updateThread != null) {
+            updateThread.interrupt();
+        }
+
         // Log Disabled
         this.getLogger().info("Disabled " + this.getName() + "!");
     }
@@ -82,15 +86,41 @@ public class DynmapPS extends JavaPlugin {
         }
     }
 
+    // The update loop
+    private void updateLoop() {
+        // If the thread already exists, but the method is called from a
+        // different thread (therefore making a new one), interrupt the old thread.
+        if (updateThread != null && Thread.currentThread() != updateThread && updateThread.isAlive()) {
+            updateThread.interrupt();
+        }
+
+        // Create the thread and start it
+        updateThread = new Thread(() -> {
+            // Do work
+            this.updateMarkerSet();
+
+            // Wait patiently
+            int time = this.getConfig().getInt("update_time");
+            if (time < 2) {
+                time = 2;
+            }
+
+            // Sleep for "time" and return if interrupted
+            try {
+                Thread.sleep(time * 1000);
+            } catch (InterruptedException e) {
+                return;
+            }
+
+            // Call next loop
+            updateLoop();
+        });
+        updateThread.start();
+    }
+
     // Update the marker set
     private void updateMarkerSet() {
         ForceFieldManager manager = preciousStones.getForceFieldManager();
-
-        // Empty old marker set
-        for (AreaMarker marker : markerSet.getAreaMarkers()) {
-            marker.deleteMarker();
-        }
-        markers.clear();
 
         // Create marker cache
         ArrayList<DPSMarker> markersCache = new ArrayList<>();
@@ -101,6 +131,11 @@ public class DynmapPS extends JavaPlugin {
             // Loop through all fields
             List<Field> fields = manager.getFields("*", world);
             for (Field field : fields) {
+                // Skip certain fields
+                if (field.isDisabled() || field.getHidingModule().isHidden()) {
+                    continue;
+                }
+
                 // Prepare field information
                 String id = String.valueOf(field.getId());
                 String name = field.getOwner();
@@ -158,6 +193,8 @@ public class DynmapPS extends JavaPlugin {
          * This method is probably not even remotely close to the most efficient way to do this, but this is what I was
          * able to come up with and I'm quite proud of it. If you can improve it without breaking the logic, go for it.
          */
+        // TODO: This logic needs to be simplified somehow, someway. Either that, or we figure out a solution for the > 1s time it takes.
+        // TODO: When the plugin encounters a circle, it does not close the circle but instead put a diagonal line. Fix this!!
         this.getLogger().info("Starting " + this.getName() + " rebuild...");
         long startTime = System.nanoTime();
         int prevcount = markersCache.size();
@@ -166,70 +203,84 @@ public class DynmapPS extends JavaPlugin {
 
             boolean insersection = false;
             for (int j = 0; j < markersCache.size(); j++) {
-                DPSMarker inner = markersCache.get(j);
+                try {
+                    DPSMarker inner = markersCache.get(j);
 
-                // If they are the same, don't check
-                if (outer.equals(inner)) {
-                    continue;
+                    // If they are the same, don't check
+                    if (outer.equals(inner)) {
+                        continue;
+                    }
+
+                    // If the labels and the world don't match, don't check
+                    if (!outer.getLabel().equals(inner.getLabel()) || !outer.getWorld().equals(inner.getWorld())) {
+                        continue;
+                    }
+
+                    // Create Polygons
+                    Polygon outerPolygon = outer.getPolygon();
+                    Polygon innerPolygon = inner.getPolygon();
+
+                    // If the markers do not intersect or they are not valid, do not combine them
+                    if (!outerPolygon.intersects(innerPolygon) || !outerPolygon.isValid() || !innerPolygon.isValid()) {
+                        continue;
+                    }
+
+                    // Union the Polygons
+//                    Geometry unionPolygon = outerPolygon.union(innerPolygon);
+                    Geometry unionPolygon = UnaryUnionOp.union(Arrays.asList(outerPolygon, innerPolygon));
+                    Coordinate[] unionCoordinates = unionPolygon.getCoordinates();
+
+                    if (!unionPolygon.isValid() || !unionPolygon.isSimple()) {
+                        continue;
+                    }
+
+                    // Convert Coordinates to Marker Format
+                    double[] x = new double[unionCoordinates.length];
+                    double[] z = new double[unionCoordinates.length];
+                    for (int k = 0; k < unionCoordinates.length; k++) {
+                        x[k] = unionCoordinates[k].x;
+                        z[k] = unionCoordinates[k].y;
+                    }
+
+                    // Create New Marker
+                    DPSMarker unionMarker = new DPSMarker(outer.getId() + "_" + inner.getId(), outer.getLabel(), outer.getWorld(), x, z);
+
+                    // Remove inner marker so it does not get counted as an outer marker
+                    markersCache.remove(inner);
+
+                    // Set us back a number so we re-loop with the new size
+                    j--;
+
+                    // Set Outer Marker to Combination
+                    outer = unionMarker;
+
+                    // Set intersection to true
+                    insersection = true;
+                } catch (Exception e) {
+                    e.printStackTrace(); // TODO: Debug mode?
                 }
-
-                // If the labels and the world don't match, don't check
-                if (!outer.getLabel().equals(inner.getLabel()) || !outer.getWorld().equals(inner.getWorld())) {
-                    continue;
-                }
-
-                // Create Polygons
-                Polygon outerPolygon = outer.getPolygon();
-                Polygon innerPolygon = inner.getPolygon();
-
-                // If the markers do not intersect, do not combine them
-                if (!outerPolygon.intersects(innerPolygon)) {
-                    continue;
-                }
-
-                // Union the Polygons
-                Geometry unionPolygon = outerPolygon.union(innerPolygon);
-                Coordinate[] unionCoordinates = unionPolygon.getCoordinates();
-
-                // Convert Coordinates to Marker Format
-                double[] x = new double[unionCoordinates.length];
-                double[] z = new double[unionCoordinates.length];
-                for (int k = 0; k < unionCoordinates.length; k++) {
-                    x[k] = unionCoordinates[k].x;
-                    z[k] = unionCoordinates[k].y;
-                }
-
-                // Create New Marker
-                DPSMarker unionMarker = new DPSMarker(outer.getId() + "_" + inner.getId(), outer.getLabel(), outer.getWorld(), x, z);
-
-                // Remove inner marker so it does not get counted as an outer marker
-                markersCache.remove(inner);
-
-                // Set us back a number so we re-loop with the new size
-                j--;
-
-                // Set Outer Marker to Combination
-                outer = unionMarker;
-
-                // Set intersection to true
-                insersection = true;
             }
 
-            // If we intersected, run this one again
+            // Re-run this outer until there are no more intersections
             if (insersection) {
                 markersCache.set(i, outer);
                 i--;
             }
         }
 
+        // Empty old marker set
+        for (AreaMarker marker : markerSet.getAreaMarkers()) {
+            marker.deleteMarker();
+        }
+
         // Create the markers
         for (DPSMarker dpsMarker : markersCache) {
-            markers.add(this.createAreaMarker(dpsMarker.getId(), dpsMarker.getLabel(), dpsMarker.getWorld(), dpsMarker.getX(), dpsMarker.getZ()));
+            this.createAreaMarker(dpsMarker.getId(), dpsMarker.getLabel(), dpsMarker.getWorld(), dpsMarker.getX(), dpsMarker.getZ());
         }
 
         // Determine how long it took
         long endTime = System.nanoTime();
-        this.getLogger().info("Rebuild complete. Took " + (endTime - startTime) / 1000000 + "ms. Combined " + prevcount + " fields down into " + markers.size() + " markers.");
+        this.getLogger().info("Rebuild complete. Took " + (endTime - startTime) / 1000000 + "ms. Combined " + prevcount + " fields down into " + markerSet.getAreaMarkers().size() + " markers.");
 
         // Collect garbage because we generated a lot
         System.gc();

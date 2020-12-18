@@ -3,6 +3,7 @@ api-version: "1.16"
 main: com.firecontroller1847.dynmapps.DynmapPS
 depend: [dynmap, PreciousStones]
 softdepend: [SimpleClans]
+load: POSTWORLD
 
   # Metadata Information
 name: ${project.name}
