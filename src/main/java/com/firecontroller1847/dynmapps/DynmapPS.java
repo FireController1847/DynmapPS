@@ -20,7 +20,7 @@ import java.util.List;
 public class DynmapPS extends JavaPlugin {
 
     // Constants
-    public static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(1));
+    public static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory();
 
     // Plugins
     private DynmapAPI dynmapApi;
@@ -166,14 +166,14 @@ public class DynmapPS extends JavaPlugin {
                 // Create the field outline
                 double[] x = new double[4];
                 double[] z = new double[4];
-                x[0] = field.getMaxx();
-                z[0] = field.getMaxz();
-                x[1] = field.getMaxx();
-                z[1] = field.getMinz() + 0.0;
-                x[2] = field.getMinx() + 0.0;
-                z[2] = field.getMinz() + 0.0;
-                x[3] = field.getMinx() + 0.0;
-                z[3] = field.getMaxz();
+                x[0] = field.getMaxx() + 0.5;
+                z[0] = field.getMaxz() + 0.5;
+                x[1] = field.getMaxx() + 0.5;
+                z[1] = field.getMinz() - 0.5;
+                x[2] = field.getMinx() - 0.5;
+                z[2] = field.getMinz() - 0.5;
+                x[3] = field.getMinx() - 0.5;
+                z[3] = field.getMaxz() + 0.5;
 
                 // Create the marker and add to cache
                 markersCache.add(new DPSMarker(id, name, world.getName(), x, z));
