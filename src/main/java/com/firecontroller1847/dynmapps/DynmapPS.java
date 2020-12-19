@@ -15,10 +15,12 @@ import org.locationtech.jts.geom.*;
 import org.locationtech.jts.operation.union.UnaryUnionOp;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class DynmapPS extends JavaPlugin {
+
+    // Constants
+    public static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(1));
 
     // Plugins
     private DynmapAPI dynmapApi;
@@ -192,80 +194,86 @@ public class DynmapPS extends JavaPlugin {
          *
          * This method is probably not even remotely close to the most efficient way to do this, but this is what I was
          * able to come up with and I'm quite proud of it. If you can improve it without breaking the logic, go for it.
+         *
+         * NOTE: If you ever need to debug something, the JTS TestBuilder is the way to go. Log out the polygons using .toText() and put them into the builder.
          */
         // TODO: This logic needs to be simplified somehow, someway. Either that, or we figure out a solution for the > 1s time it takes.
-        // TODO: When the plugin encounters a circle, it does not close the circle but instead put a diagonal line. Fix this!!
         this.getLogger().info("Starting " + this.getName() + " rebuild...");
         long startTime = System.nanoTime();
         int prevcount = markersCache.size();
-        for (int i = 0; i < markersCache.size(); i++) {
-            DPSMarker outer = markersCache.get(i);
 
-            boolean insersection = false;
-            for (int j = 0; j < markersCache.size(); j++) {
-                try {
+        // Begin Combination Loop
+        try {
+            for (int i = 0; i < markersCache.size(); i++) {
+                DPSMarker outer = markersCache.get(i);
+
+                // Begin Inner Loop
+                boolean intersected = false;
+                for (int j = 0; j < markersCache.size(); j++) {
                     DPSMarker inner = markersCache.get(j);
 
-                    // If they are the same, don't check
+                    // Prevent checking the same thing
                     if (outer.equals(inner)) {
                         continue;
                     }
 
-                    // If the labels and the world don't match, don't check
+                    // If the labels or the world don't match, don't check
                     if (!outer.getLabel().equals(inner.getLabel()) || !outer.getWorld().equals(inner.getWorld())) {
                         continue;
                     }
 
-                    // Create Polygons
-                    Polygon outerPolygon = outer.getPolygon();
-                    Polygon innerPolygon = inner.getPolygon();
-
-                    // If the markers do not intersect or they are not valid, do not combine them
-                    if (!outerPolygon.intersects(innerPolygon) || !outerPolygon.isValid() || !innerPolygon.isValid()) {
+                    // Check to ensure the polygons do intersect
+                    if (!outer.getGeometry().intersects(inner.getGeometry())) {
                         continue;
                     }
 
-                    // Union the Polygons
-//                    Geometry unionPolygon = outerPolygon.union(innerPolygon);
-                    Geometry unionPolygon = UnaryUnionOp.union(Arrays.asList(outerPolygon, innerPolygon));
-                    Coordinate[] unionCoordinates = unionPolygon.getCoordinates();
+                    // Union the polygons
+                    Geometry union = UnaryUnionOp.union(GEOMETRY_FACTORY.createGeometryCollection(new Geometry[] { outer.getGeometry(), inner.getGeometry() }));
 
-                    if (!unionPolygon.isValid() || !unionPolygon.isSimple()) {
+                    // Ingore non-polygons
+                    if (!(union instanceof Polygon)) {
                         continue;
                     }
 
-                    // Convert Coordinates to Marker Format
-                    double[] x = new double[unionCoordinates.length];
-                    double[] z = new double[unionCoordinates.length];
-                    for (int k = 0; k < unionCoordinates.length; k++) {
-                        x[k] = unionCoordinates[k].x;
-                        z[k] = unionCoordinates[k].y;
+                    // If the geometry has holes, continue
+                    if (((Polygon) union).getNumInteriorRing() > 0) {
+                        continue;
                     }
 
-                    // Create New Marker
-                    DPSMarker unionMarker = new DPSMarker(outer.getId() + "_" + inner.getId(), outer.getLabel(), outer.getWorld(), x, z);
+                    // Convert coordinates
+                    Coordinate[] coordinates = union.getCoordinates();
+                    double[] x = new double[coordinates.length];
+                    double[] z = new double[coordinates.length];
+                    for (int k = 0; k < coordinates.length; k++) {
+                        x[k] = coordinates[k].x;
+                        z[k] = coordinates[k].y;
+                    }
 
-                    // Remove inner marker so it does not get counted as an outer marker
+                    // Update Outer
+                    outer.setX(x);
+                    outer.setZ(z);
+                    outer.setGeometry(union);
+
+                    // Remove the unioned polygon
                     markersCache.remove(inner);
 
-                    // Set us back a number so we re-loop with the new size
-                    j--;
+                    // We did intersect so "return true"
+                    intersected = true;
 
-                    // Set Outer Marker to Combination
-                    outer = unionMarker;
+                    // Now that outer is updated, run this loop with j - 1 because we removed an inner polygon
+                    --j;
+                }
 
-                    // Set intersection to true
-                    insersection = true;
-                } catch (Exception e) {
-                    e.printStackTrace(); // TODO: Debug mode?
+                // Update the cache
+                markersCache.set(i, outer);
+
+                // Re-loop if we intersected to try and find any more intersections
+                if (intersected) {
+                    --i;
                 }
             }
-
-            // Re-run this outer until there are no more intersections
-            if (insersection) {
-                markersCache.set(i, outer);
-                i--;
-            }
+        } catch (Exception e) {
+            e.printStackTrace(); // TODO: debug option
         }
 
         // Empty old marker set

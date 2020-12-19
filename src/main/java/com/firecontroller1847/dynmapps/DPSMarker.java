@@ -1,7 +1,7 @@
 package com.firecontroller1847.dynmapps;
 
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Polygon;
 
 import java.util.ArrayList;
@@ -14,7 +14,7 @@ public class DPSMarker {
     private String world;
     private double[] x;
     private double[] z;
-    private Polygon polygon;
+    private Geometry geometry;
 
     // Dynamic Variables
 
@@ -25,7 +25,7 @@ public class DPSMarker {
         this.world = world;
         this.x = x;
         this.z = z;
-        this.polygon = toPolygon();
+        this.geometry = toPolygon();
     }
 
     // Getters
@@ -44,8 +44,8 @@ public class DPSMarker {
     public double[] getZ() {
         return z;
     }
-    public Polygon getPolygon() {
-        return polygon;
+    public Geometry getGeometry() {
+        return geometry;
     }
 
     // Setters
@@ -64,13 +64,13 @@ public class DPSMarker {
     public void setZ(double[] z) {
         this.z = z;
     }
-    public void setPolygon(Polygon polygon) {
-        this.polygon = polygon;
+    public void setGeometry(Geometry geometry) {
+        this.geometry = geometry;
     }
 
     // Utility method to convert from a DPSMarker to a Polygon
     public Polygon toPolygon() {
-        return new GeometryFactory().createPolygon(toCoordinates(this));
+        return DynmapPS.GEOMETRY_FACTORY.createPolygon(toCoordinates(this));
     }
 
     // Utility method to convert from an DPSMarker to Coordinates
