@@ -6,129 +6,139 @@ import net.sacredlabyrinth.Phaed.PreciousStones.managers.ForceFieldManager;
 import net.sacredlabyrinth.phaed.simpleclans.Clan;
 import net.sacredlabyrinth.phaed.simpleclans.SimpleClans;
 import org.bukkit.World;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.dynmap.DynmapAPI;
 import org.dynmap.markers.AreaMarker;
 import org.dynmap.markers.MarkerAPI;
 import org.dynmap.markers.MarkerSet;
-import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.operation.union.UnaryUnionOp;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
-public class DynmapPS extends JavaPlugin {
+public class DynmapPS extends FirePlugin {
 
     // Constants
     public static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory();
 
-    // Plugins
+    // Dependent Plugins
     private DynmapAPI dynmapApi;
     private PreciousStones preciousStones;
     private SimpleClans simpleClans;
 
-    // Variables
-    private MarkerSet markerSet; // The set of markers to use on Dynmap
-    private Thread updateThread; // The thread which loops for rebuilding
+    // Layers
+    private ArrayList<DPSLayer> layers = new ArrayList<>();
 
-    // On Enable
+    // After Configuration
     @Override
-    public void onEnable() {
-        // Setup Configuration
-        this.saveDefaultConfig();
+    public boolean onAfterConfiguration() {
+        // Load dependent plugins
+        dynmapApi = (DynmapAPI) this.loadPlugin("dynmap");
+        preciousStones = (PreciousStones) this.loadPlugin("PreciousStones");
+        simpleClans = (SimpleClans) this.loadPlugin("SimpleClans");
 
-        // Get Dynmap
-        dynmapApi = (DynmapAPI) this.getServer().getPluginManager().getPlugin("dynmap");
-        if (dynmapApi == null) {
-            this.getLogger().severe("Missing Dynmap!");
-            return;
+        // Verify required plugins
+        if (dynmapApi == null || preciousStones == null) {
+            this.getLogger().severe("Dynmap or PreciousStones dependency is missing!");
+            return false;
         }
 
-        // Get PreciousStones
-        preciousStones = (PreciousStones) this.getServer().getPluginManager().getPlugin("PreciousStones");
-        if (preciousStones == null) {
-            this.getLogger().severe("Missing PreciousStones!");
-            return;
+        // Parse configuration
+        if (!this.onConfigReload()) {
+            return false;
         }
 
-        // Get SimpleClans (Optional)
-        simpleClans = (SimpleClans) this.getServer().getPluginManager().getPlugin("SimpleClans");
+        // Create the marker sets
+        this.createMarkerSets();
 
-        // Prepare Marker Set
-        this.prepareMarkerSet();
+        // Register update loop
+        int updateLoopDelay = this.getConfig().getInt("rebuild_time");
+        if (updateLoopDelay < 5) {
+            updateLoopDelay = 5;
+        }
+        this.addLoop("update", updateLoopDelay * 1000, this::update);
 
-        // TODO: Actually update the markers...
-        this.updateLoop();
-
-        // Log Enabled
-        this.getLogger().info("Enabled " + this.getName() + "!");
+        // We have loaded successfully
+        return true;
     }
 
-    // On Disable
     @Override
-    public void onDisable() {
-        if (updateThread != null) {
-            updateThread.interrupt();
+    public boolean onConfigReload() {
+        // Ensure layers is empty
+        layers.clear();
+
+        // Parse layers in the configuration
+        List<Map<?, ?>> layersRaw = this.getConfig().getMapList("layers");
+        for (Map<?, ?> layerRaw : layersRaw) {
+            try {
+                DPSLayer layer = DPSLayer.parseLayer(layerRaw);
+                layers.add(layer);
+            } catch (Exception e) {
+                e.printStackTrace();
+                this.getLogger().severe("Error parsing configuration. Are your layers set up correctly?");
+                return false;
+            }
         }
 
-        // Log Disabled
-        this.getLogger().info("Disabled " + this.getName() + "!");
+        // Update the marker sets
+        this.createMarkerSets();
+
+        // All's well that ends well
+        return true;
     }
 
-    // Initialize the PreciousStones marker set
-    private void prepareMarkerSet() {
+    // Constructs all of the marker sets
+    private void createMarkerSets() {
         MarkerAPI markerApi = dynmapApi.getMarkerAPI();
-        markerSet = markerApi.getMarkerSet("preciousstones.fields");
-        if (markerSet == null) {
-            markerSet = markerApi.createMarkerSet("preciousstones.fields", "Protection Fields", null, false);
-        }
-        if (markerSet == null) {
-            this.getLogger().severe("Error creating the protection field marker set!");
-            return;
-        }
-    }
 
-    // The update loop
-    private void updateLoop() {
-        // If the thread already exists, but the method is called from a
-        // different thread (therefore making a new one), interrupt the old thread.
-        if (updateThread != null && Thread.currentThread() != updateThread && updateThread.isAlive()) {
-            updateThread.interrupt();
-        }
+        // Loop through all layers
+        for (DPSLayer layer : layers) {
 
-        // Create the thread and start it
-        updateThread = new Thread(() -> {
-            // Do work
-            this.updateMarkerSet();
-
-            // Wait patiently
-            int time = this.getConfig().getInt("update_time");
-            if (time < 2) {
-                time = 2;
+            // Search for existing marker, and make one if it doesn't exist
+            MarkerSet markerSet = markerApi.getMarkerSet(layer.getId());
+            if (markerSet == null) {
+                markerSet = markerApi.createMarkerSet(layer.getId(), layer.getLabel(), null, false);
             }
 
-            // Sleep for "time" and return if interrupted
-            try {
-                Thread.sleep(time * 1000);
-            } catch (InterruptedException e) {
+            // If the marker set still doesn't exist, there had to have been an error
+            if (markerSet == null) {
+                this.getLogger().severe("Error creating the protection field marker set!");
+                disable();
                 return;
             }
 
-            // Call next loop
-            updateLoop();
-        });
-        updateThread.start();
+            // Set layer priority
+            markerSet.setLayerPriority(layer.getPriority());
+
+            // Tie the marker to the layer
+            layer.setMarkerSet(markerSet);
+        }
     }
 
-    // Update the marker set
-    private void updateMarkerSet() {
+    // Updates the markers and marker sets
+    // This all happens on a different thread than the main server thread to prevent lag
+    private void update() {
         ForceFieldManager manager = preciousStones.getForceFieldManager();
+        this.getLogger().info("Starting " + this.getName() + " rebuild...");
+        long startTime = System.nanoTime();
+
+        // Empty all of the old marker sets
+        for (DPSLayer layer : layers) {
+            for (AreaMarker marker : layer.getMarkerSet().getAreaMarkers()) {
+                marker.deleteMarker();
+            }
+        }
 
         // Create marker cache
         ArrayList<DPSMarker> markersCache = new ArrayList<>();
 
         // Loop through all worlds
         for (World world : this.getServer().getWorlds()) {
+
+            // TODO: Worlds to skip
 
             // Loop through all fields
             List<Field> fields = manager.getFields("*", world);
@@ -138,11 +148,25 @@ public class DynmapPS extends JavaPlugin {
                     continue;
                 }
 
+                // Get layer otherwise skip this field
+                DPSLayer ourLayer = null;
+                for (DPSLayer layer : layers) {
+                    if (layer.getFields().contains(field.getSettings().getTitle())) {
+                        ourLayer = layer;
+                        break;
+                    }
+                }
+                if (ourLayer == null) {
+                    continue;
+                }
+
                 // Prepare field information
+                // TODO: Name configurability (%name%, %id%, %clan%?)
                 String id = String.valueOf(field.getId());
                 String name = field.getOwner();
+                String clanName = null;
 
-                // Add SimpleClans support
+                // SimpleClans support
                 if (simpleClans != null) {
                     // Check if there is a clan allowed on the field
                     String clanTag = null;
@@ -158,12 +182,13 @@ public class DynmapPS extends JavaPlugin {
                         Clan clan = simpleClans.getClanManager().getClan(clanTag);
                         if (clan != null) {
                             // Set the name to the clan name
-                            name = "Clan " + clan.getName();
+                            clanName = "Clan " + clan.getName();
                         }
                     }
                 }
 
                 // Create the field outline
+                // We add and subtract .5 to ensure that fields go to the edge of blocks
                 double[] x = new double[4];
                 double[] z = new double[4];
                 x[0] = field.getMaxx() + 0.5;
@@ -176,86 +201,129 @@ public class DynmapPS extends JavaPlugin {
                 z[3] = field.getMaxz() + 0.5;
 
                 // Create the marker and add to cache
-                markersCache.add(new DPSMarker(id, name, world.getName(), x, z));
+                markersCache.add(new DPSMarker(id, clanName != null ? clanName : name, world.getName(), x, z, ourLayer));
             }
 
         }
 
-        /*
-         * Primary Combination Loop
-         *
-         * For every marker, loop through every other marker and determine whether or not it can be combined.
-         * If it can be combined, replace the current marker with the combination. Continue doing so until there are no more markers to check
-         * Once all possible combinations are combined, move on to the next marker which may have possible combinations
-         *
-         * Due to the removal of markers, we have to re-iterate over multiple times every time one is removed to ensure all
-         * markers are accounted for. If we determined that we have combined with another marker, we also need to re-iterate
-         * through the outer loop to ensure any other possible combinations are accounted for.
-         *
-         * This method is probably not even remotely close to the most efficient way to do this, but this is what I was
-         * able to come up with and I'm quite proud of it. If you can improve it without breaking the logic, go for it.
-         *
-         * NOTE: If you ever need to debug something, the JTS TestBuilder is the way to go. Log out the polygons using .toText() and put them into the builder.
-         */
-        // TODO: This logic needs to be simplified somehow, someway. Either that, or we figure out a solution for the > 1s time it takes.
-        this.getLogger().info("Starting " + this.getName() + " rebuild...");
-        long startTime = System.nanoTime();
         int prevcount = markersCache.size();
 
-        // Begin Combination Loop
+        // Skip even checking for combinations if all layers have it disabled
+        int count = 0;
+        for (DPSLayer layer : layers) {
+            if (!layer.isCombine()) {
+                count++;
+            }
+        }
+        if (count != layers.size()) {
+            combine(markersCache);
+        }
+
+        // Create the markers
+        for (DPSMarker dpsMarker : markersCache) {
+            DPSLayer layer = dpsMarker.getLayer();
+            MarkerSet set = layer.getMarkerSet();
+            AreaMarker marker = set.createAreaMarker(dpsMarker.getId(), dpsMarker.getLabel(), false, dpsMarker.getWorld(), dpsMarker.getX(), dpsMarker.getZ(), false);
+            marker.setFillStyle(layer.getStyle().getFillOpacity(), Integer.parseInt(layer.getStyle().getFillColor().replace("#", ""), 16));
+            marker.setLineStyle(layer.getStyle().getStrokeWeight(), layer.getStyle().getStrokeOpacity(), Integer.parseInt(layer.getStyle().getStrokeColor().replace("#", ""), 16));
+        }
+
+        // Determine how long it took
+        long endTime = System.nanoTime();
+        this.getLogger().info("Rebuild complete. Took " + (endTime - startTime) / 1000000 + "ms. Combined " + prevcount + " fields down into " + markersCache.size() + " markers.");
+
+        // Collect garbage because we generated a lot
+        System.gc();
+    }
+
+    // Combines all of the markers in the given array
+    /*
+     * Primary Combination Loop
+     *
+     * For every marker, loop through every other marker and determine whether or not it can be combined.
+     * If it can be combined, replace the current marker with the combination. Continue doing so until there are no more markers to check
+     * Once all possible combinations are combined, move on to the next marker which may have possible combinations
+     *
+     * Due to the removal of markers, we have to re-iterate over multiple times every time one is removed to ensure all
+     * markers are accounted for. If we determined that we have combined with another marker, we also need to re-iterate
+     * through the outer loop to ensure any other possible combinations are accounted for.
+     *
+     * This method is probably not even remotely close to the most efficient way to do this, but this is what I was
+     * able to come up with and I'm quite proud of it. If you can improve it without breaking the logic, go for it.
+     *
+     * NOTE: If you ever need to debug something, the JTS TestBuilder is the way to go. Log out the polygons using .toText() and put them into the builder.
+     */
+    // TODO: This logic needs to be simplified somehow, someway. Either that, or we figure out a solution for the > 1s time it takes.
+    private void combine(ArrayList<DPSMarker> markers) {
         try {
-            for (int i = 0; i < markersCache.size(); i++) {
-                DPSMarker outer = markersCache.get(i);
+            for (int i = 0; i < markers.size(); i++) {
+                DPSMarker outer = markers.get(i);
 
                 // Begin Inner Loop
                 boolean intersected = false;
-                for (int j = 0; j < markersCache.size(); j++) {
-                    DPSMarker inner = markersCache.get(j);
+                for (int j = 0; j < markers.size(); j++) {
+                    DPSMarker inner = markers.get(j);
 
                     // Prevent checking the same thing
                     if (outer.equals(inner)) {
                         continue;
                     }
 
-                    // If the labels or the world don't match, don't check
+                    // If the labels or the world don't match, do not combine
                     if (!outer.getLabel().equals(inner.getLabel()) || !outer.getWorld().equals(inner.getWorld())) {
                         continue;
                     }
 
-                    // Check to ensure the polygons do intersect
+                    // If the layers do not match, do not combine
+                    // No need to check IDs when the objects should be the same
+                    if (!outer.getLayer().equals(inner.getLayer())) {
+                        continue;
+                    }
+
+                    // If the layer is set to not combine, do not combine
+                    // NOTE: We don't need to check inner because we just checked to ensure the layers are the same
+                    if (!outer.getLayer().isCombine()) {
+                        continue;
+                    }
+
+                    // If the polygons do not intersect, do not combine
                     if (!outer.getGeometry().intersects(inner.getGeometry())) {
                         continue;
                     }
 
                     // Union the polygons
-                    Geometry union = UnaryUnionOp.union(GEOMETRY_FACTORY.createGeometryCollection(new Geometry[] { outer.getGeometry(), inner.getGeometry() }));
+                    Geometry result = UnaryUnionOp.union(GEOMETRY_FACTORY.createGeometryCollection(new Geometry[] { outer.getGeometry(), inner.getGeometry() }));
 
                     // Ingore non-polygons
-                    if (!(union instanceof Polygon)) {
+                    if (!(result instanceof Polygon)) {
                         continue;
                     }
 
-                    // If the geometry has holes, continue
-                    if (((Polygon) union).getNumInteriorRing() > 0) {
+                    // If the geometry has holes, take the intersection instead of the union
+                    // Doesn't really combine more-so fill in the hole so it doesn't overlap
+                    if (((Polygon) result).getNumInteriorRing() > 0) {
+                        result = inner.getGeometry().difference(outer.getGeometry());
+                        double[][] doubleArray = DPSMarker.toDoubleArray(result.getCoordinates());
+                        double[] x = doubleArray[0];
+                        double[] z = doubleArray[1];
+                        inner.setGeometry(result);
+                        inner.setX(x);
+                        inner.setZ(z);
                         continue;
                     }
 
                     // Convert coordinates
-                    Coordinate[] coordinates = union.getCoordinates();
-                    double[] x = new double[coordinates.length];
-                    double[] z = new double[coordinates.length];
-                    for (int k = 0; k < coordinates.length; k++) {
-                        x[k] = coordinates[k].x;
-                        z[k] = coordinates[k].y;
-                    }
+                    double[][] doubleArray = DPSMarker.toDoubleArray(result.getCoordinates());
+                    double[] x = doubleArray[0];
+                    double[] z = doubleArray[1];
 
                     // Update Outer
                     outer.setX(x);
                     outer.setZ(z);
-                    outer.setGeometry(union);
+                    outer.setGeometry(result);
 
                     // Remove the unioned polygon
-                    markersCache.remove(inner);
+                    markers.remove(inner);
 
                     // We did intersect so "return true"
                     intersected = true;
@@ -265,7 +333,7 @@ public class DynmapPS extends JavaPlugin {
                 }
 
                 // Update the cache
-                markersCache.set(i, outer);
+                markers.set(i, outer);
 
                 // Re-loop if we intersected to try and find any more intersections
                 if (intersected) {
@@ -273,30 +341,10 @@ public class DynmapPS extends JavaPlugin {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace(); // TODO: debug option
+            // TODO: debug option
+            e.printStackTrace();
+            this.getLogger().warning("Internal error when attempting to combine a marker.");
         }
-
-        // Empty old marker set
-        for (AreaMarker marker : markerSet.getAreaMarkers()) {
-            marker.deleteMarker();
-        }
-
-        // Create the markers
-        for (DPSMarker dpsMarker : markersCache) {
-            this.createAreaMarker(dpsMarker.getId(), dpsMarker.getLabel(), dpsMarker.getWorld(), dpsMarker.getX(), dpsMarker.getZ());
-        }
-
-        // Determine how long it took
-        long endTime = System.nanoTime();
-        this.getLogger().info("Rebuild complete. Took " + (endTime - startTime) / 1000000 + "ms. Combined " + prevcount + " fields down into " + markerSet.getAreaMarkers().size() + " markers.");
-
-        // Collect garbage because we generated a lot
-        System.gc();
-    }
-
-    // Utility method to create a marker
-    private AreaMarker createAreaMarker(String id, String label, String world, double[] x, double[] z) {
-        return markerSet.createAreaMarker(id, label, false, world, x, z, false);
     }
 
 }

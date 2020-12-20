@@ -1,0 +1,4 @@
+# To use colors, use the following character as the prefix: §
+# Hex codes are supported! Use them in the following format: §#000000
+prefix: "[§DynmapPS]"
+no_permission: "§cYou do not have permission to run this command!"

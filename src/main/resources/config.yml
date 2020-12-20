@@ -1,1 +1,57 @@
-update_time: 30
+###########################################################################################
+#                                         WARNING                                         #
+#               THIS PLUGIN ONLY WORKS WITH AREA-BASED PRECIOUSSTONES                     #
+#   IF YOU WOULD LIKE TO ADD SUPPORT FOR NON-AREA BASED, PLEASE SUBMIT A PULL REQUEST     #
+###########################################################################################
+
+####################
+#     Language     #
+####################
+# What language you wish to use.
+# The name of the file in the lang/ folder to use for configuration.
+# Default is en which results in lang/en.yml
+rebuild_time: 60
+
+##################
+#     Layers     #
+##################
+# The layers to be used for your PreciousStones
+#
+#  layer:
+#   id: The id of this layer that will be used in dynmap (changes take effect after restart)
+#   label: The name of the layer that will show on dynmap (changes take effect after restart)
+#   fields: A list of fields to include in this layer. Relates to the "title" option on PreciousStones
+#   combine: Whether or not to combine overlapping fields into one marker (prevents a map mess, but can improve build time)
+#   priority: The order in which fields should show up on the layers menu (not actual in-map layering)
+#   style: Settings for the style of a layer
+#     fill_color: The color that markers should be filled in with
+#     fill_opacity: The opacity of the fill (1.0 to 0.0)
+#     stroke_color: The color of the outline of each marker
+#     stroke_opacity: The opacity of the outline (1.0 to 0.0)
+#     stroke_weight: How thick the stroke of the marker is in pixels
+layers:
+  - id: protection_fields
+    label: "Protection Fields"
+    fields:
+      - "protection"
+      - "repellent"
+    combine: true
+    priority: 1
+    style:
+      fill_color: "#FFFFFF"
+      fill_opacity: 0.2
+      stroke_color: "#000000"
+      stroke_opacity: 1.0
+      stroke_weight: 1
+  - id: force_fields
+    label: "Force Fields"
+    fields:
+      - "force"
+    priority: 2
+    combine: false
+    style:
+      fill_color: "#CC3333"
+      fill_opacity: 0.2
+      stroke_color: "#CC3333"
+      stroke_opacity: 1.0
+      stroke_weight: 2
