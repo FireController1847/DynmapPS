@@ -9,7 +9,7 @@
     <description>Show your PreciousStones on your Dynmap for your Minecraft server, with support for SimpleClans.</description>
     <groupId>com.firecontroller1847</groupId>
     <artifactId>dynmapps</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 
     <!-- Project Properties -->
     <properties>
