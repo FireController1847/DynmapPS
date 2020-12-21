@@ -13,18 +13,19 @@ public class DPSLayer {
     private List<String> fields;
     private boolean combine;
     private int priority;
+    private DPSLayerDisplay display;
     private DPSLayerStyle style;
     private MarkerSet markerSet; // The marker set for this DPS layer
 
     // Constructor
-    public DPSLayer(String id, String label, List<String> fields, boolean combine, int priority, DPSLayerStyle style, MarkerSet markerSet) {
+    public DPSLayer(String id, String label, List<String> fields, boolean combine, int priority, DPSLayerDisplay display, DPSLayerStyle style) {
         this.id = id;
         this.label = label;
         this.fields = fields;
         this.combine = combine;
         this.priority = priority;
+        this.display = display;
         this.style = style;
-        this.markerSet = markerSet;
     }
     private DPSLayer() { }
 
@@ -43,6 +44,9 @@ public class DPSLayer {
     }
     public int getPriority() {
         return priority;
+    }
+    public DPSLayerDisplay getDisplay() {
+        return display;
     }
     public DPSLayerStyle getStyle() {
         return style;
@@ -67,6 +71,9 @@ public class DPSLayer {
     public void setPriority(int priority) {
         this.priority = priority;
     }
+    public void setDisplay(DPSLayerDisplay display) {
+        this.display = display;
+    }
     public void setStyle(DPSLayerStyle style) {
         this.style = style;
     }
@@ -84,6 +91,7 @@ public class DPSLayer {
             layer.fields = (List<String>) map.get("fields");
             layer.combine = (boolean) map.get("combine");
             layer.priority = Integer.parseInt(map.get("priority").toString());
+            layer.display = DPSLayerDisplay.parseLayerStyle((Map<?, ?>) map.get("display"));
             layer.style = DPSLayerStyle.parseLayerStyle((Map<?, ?>) map.get("style"));
         } catch (Exception e) {
             throw new Exception("Invalid configuration!", e);
@@ -100,6 +108,7 @@ public class DPSLayer {
                 ", fields=" + fields +
                 ", combine=" + combine +
                 ", priority=" + priority +
+                ", display=" + display +
                 ", style=" + style +
                 ", markerSet=" + markerSet +
                 '}';

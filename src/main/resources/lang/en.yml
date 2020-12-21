@@ -1,4 +1,14 @@
 # To use colors, use the following character as the prefix: §
 # Hex codes are supported! Use them in the following format: §#000000
+# Layer display variables:
+#   %id%: The id of the PreciousStone
+#   %name%: The name of the PreciousStone
+#   %owner%: The owner of the PreciousStone
+#   %title%: The title of the PreciousStone
+#   %clan%: The name of the clan
+#   %clan_tag%: The tag (identifier) of the clan
+#   %clan_owner%: The name of the owner of the clan
+#   %clan_description%: The description of the clan
+#   %clan_member_count%: The amount of members in the clan
 prefix: "[§DynmapPS]"
 no_permission: "§cYou do not have permission to run this command!"

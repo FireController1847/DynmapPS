@@ -12,6 +12,19 @@
 # Default is en which results in lang/en.yml
 rebuild_time: 60
 
+#################
+#     Debug     #
+#################
+# Whether or not to log debug information
+debug: false
+
+##################
+#     Worlds     #
+##################
+# The names of the worlds that should not be included
+skipped_worlds:
+  - "world_creative"
+
 ##################
 #     Layers     #
 ##################
@@ -23,6 +36,10 @@ rebuild_time: 60
 #   fields: A list of fields to include in this layer. Relates to the "title" option on PreciousStones
 #   combine: Whether or not to combine overlapping fields into one marker (prevents a map mess, but can improve build time)
 #   priority: The order in which fields should show up on the layers menu (not actual in-map layering)
+#   display: Options for the naming of the markers
+#     detect_clans: When a clan is detected, use clan_name instead of name
+#     name: The name for every marker. See language file for supported variables
+#     clan_name: The name for every clan. See language file for supported variables
 #   style: Settings for the style of a layer
 #     fill_color: The color that markers should be filled in with
 #     fill_opacity: The opacity of the fill (1.0 to 0.0)
@@ -37,6 +54,10 @@ layers:
       - "repellent"
     combine: true
     priority: 1
+    display:
+      detect_clans: true
+      name: "%owner%"
+      clan_name: "Clan %clan%"
     style:
       fill_color: "#FFFFFF"
       fill_opacity: 0.2
@@ -49,6 +70,10 @@ layers:
       - "force"
     priority: 2
     combine: false
+    display:
+      detect_clans: false
+      name: "%owner%"
+      clan_name: "Clan %clan%"
     style:
       fill_color: "#CC3333"
       fill_opacity: 0.2

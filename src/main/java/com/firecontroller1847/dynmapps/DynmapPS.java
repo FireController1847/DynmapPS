@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+// TODO: Add reload command
 public class DynmapPS extends FirePlugin {
 
     // Constants
@@ -122,15 +123,10 @@ public class DynmapPS extends FirePlugin {
     // This all happens on a different thread than the main server thread to prevent lag
     private void update() {
         ForceFieldManager manager = preciousStones.getForceFieldManager();
-        this.getLogger().info("Starting " + this.getName() + " rebuild...");
-        long startTime = System.nanoTime();
-
-        // Empty all of the old marker sets
-        for (DPSLayer layer : layers) {
-            for (AreaMarker marker : layer.getMarkerSet().getAreaMarkers()) {
-                marker.deleteMarker();
-            }
+        if (this.getConfig().getBoolean("debug")) {
+            this.getLogger().info("Starting " + this.getName() + " rebuild...");
         }
+        long startTime = System.nanoTime();
 
         // Create marker cache
         ArrayList<DPSMarker> markersCache = new ArrayList<>();
@@ -138,7 +134,17 @@ public class DynmapPS extends FirePlugin {
         // Loop through all worlds
         for (World world : this.getServer().getWorlds()) {
 
-            // TODO: Worlds to skip
+            List<String> skippedWorlds = this.getConfig().getStringList("skipped_worlds");
+            boolean skip = false;
+            for (String skippedWorld : skippedWorlds) {
+                if (world.getName().equals(skippedWorld)) {
+                    skip = true;
+                    break;
+                }
+            }
+            if (skip) {
+                continue;
+            }
 
             // Loop through all fields
             List<Field> fields = manager.getFields("*", world);
@@ -160,14 +166,13 @@ public class DynmapPS extends FirePlugin {
                     continue;
                 }
 
-                // Prepare field information
-                // TODO: Name configurability (%name%, %id%, %clan%?)
-                String id = String.valueOf(field.getId());
-                String name = field.getOwner();
-                String clanName = null;
-
                 // SimpleClans support
-                if (simpleClans != null) {
+                String finalName = ourLayer.getDisplay().getName()
+                        .replace("%id%", String.valueOf(field.getId()))
+                        .replace("%name%", field.getName())
+                        .replace("%owner%", field.getOwner())
+                        .replace("%title%", field.getSettings().getTitle());
+                if (ourLayer.getDisplay().isDetectClans() && simpleClans != null) {
                     // Check if there is a clan allowed on the field
                     String clanTag = null;
                     for (String allowed : field.getAllAllowed()) {
@@ -178,12 +183,19 @@ public class DynmapPS extends FirePlugin {
                     }
 
                     // Attempt to fetch the clan
+                    Clan clan = null;
                     if (clanTag != null) {
-                        Clan clan = simpleClans.getClanManager().getClan(clanTag);
-                        if (clan != null) {
-                            // Set the name to the clan name
-                            clanName = "Clan " + clan.getName();
-                        }
+                        clan = simpleClans.getClanManager().getClan(clanTag);
+                    }
+
+                    // Set name
+                    if (clan != null) {
+                        finalName = ourLayer.getDisplay().getClanName()
+                                .replace("%clan%", clan.getName())
+                                .replace("%clan_owner%", clan.getLeaders().get(0).getCleanName())
+                                .replace("%clan_description%", clan.getDescription())
+                                .replace("%clan_tag%", clan.getTag())
+                                .replace("%clan_member_count%", String.valueOf(clan.getMembers().size()));
                     }
                 }
 
@@ -201,7 +213,7 @@ public class DynmapPS extends FirePlugin {
                 z[3] = field.getMaxz() + 0.5;
 
                 // Create the marker and add to cache
-                markersCache.add(new DPSMarker(id, clanName != null ? clanName : name, world.getName(), x, z, ourLayer));
+                markersCache.add(new DPSMarker(String.valueOf(field.getId()), finalName, world.getName(), x, z, ourLayer));
             }
 
         }
@@ -219,18 +231,29 @@ public class DynmapPS extends FirePlugin {
             combine(markersCache);
         }
 
+        // Empty all of the old marker sets
+        for (DPSLayer layer : layers) {
+            for (AreaMarker marker : layer.getMarkerSet().getAreaMarkers()) {
+                marker.deleteMarker();
+            }
+        }
+
         // Create the markers
         for (DPSMarker dpsMarker : markersCache) {
             DPSLayer layer = dpsMarker.getLayer();
             MarkerSet set = layer.getMarkerSet();
             AreaMarker marker = set.createAreaMarker(dpsMarker.getId(), dpsMarker.getLabel(), false, dpsMarker.getWorld(), dpsMarker.getX(), dpsMarker.getZ(), false);
-            marker.setFillStyle(layer.getStyle().getFillOpacity(), Integer.parseInt(layer.getStyle().getFillColor().replace("#", ""), 16));
-            marker.setLineStyle(layer.getStyle().getStrokeWeight(), layer.getStyle().getStrokeOpacity(), Integer.parseInt(layer.getStyle().getStrokeColor().replace("#", ""), 16));
+            if (marker != null) {
+                marker.setFillStyle(layer.getStyle().getFillOpacity(), Integer.parseInt(layer.getStyle().getFillColor().replace("#", ""), 16));
+                marker.setLineStyle(layer.getStyle().getStrokeWeight(), layer.getStyle().getStrokeOpacity(), Integer.parseInt(layer.getStyle().getStrokeColor().replace("#", ""), 16));
+            }
         }
 
         // Determine how long it took
         long endTime = System.nanoTime();
-        this.getLogger().info("Rebuild complete. Took " + (endTime - startTime) / 1000000 + "ms. Combined " + prevcount + " fields down into " + markersCache.size() + " markers.");
+        if (this.getConfig().getBoolean("debug")) {
+            this.getLogger().info("Rebuild complete. Took " + (endTime - startTime) / 1000000 + "ms. Combined " + prevcount + " fields down into " + markersCache.size() + " markers.");
+        }
 
         // Collect garbage because we generated a lot
         System.gc();
@@ -341,8 +364,9 @@ public class DynmapPS extends FirePlugin {
                 }
             }
         } catch (Exception e) {
-            // TODO: debug option
-            e.printStackTrace();
+            if (this.getConfig().getBoolean("debug")) {
+                e.printStackTrace();
+            }
             this.getLogger().warning("Internal error when attempting to combine a marker.");
         }
     }
