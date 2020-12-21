@@ -89,7 +89,7 @@ public class DPSLayer {
             layer.id = (String) map.get("id");
             layer.label = (String) map.get("label");
             layer.fields = (List<String>) map.get("fields");
-            layer.combine = (boolean) map.get("combine");
+            layer.combine = (Boolean) map.get("combine");
             layer.priority = Integer.parseInt(map.get("priority").toString());
             layer.display = DPSLayerDisplay.parseLayerStyle((Map<?, ?>) map.get("display"));
             layer.style = DPSLayerStyle.parseLayerStyle((Map<?, ?>) map.get("style"));

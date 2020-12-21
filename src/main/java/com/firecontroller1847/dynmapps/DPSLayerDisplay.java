@@ -43,7 +43,7 @@ public class DPSLayerDisplay {
     public static DPSLayerDisplay parseLayerStyle(Map<?,?> map) throws Exception {
         DPSLayerDisplay display = new DPSLayerDisplay();
         try {
-            display.detectClans = (boolean) map.get("detect_clans");
+            display.detectClans = (Boolean) map.get("detect_clans");
             display.name = (String) map.get("name");
             display.clanName = (String) map.get("clan_name");
         } catch (Exception e) {
