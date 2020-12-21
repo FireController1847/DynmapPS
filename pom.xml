@@ -24,6 +24,18 @@
             <id>spigot-repo</id>
             <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
         </repository>
+        <repository>
+            <id>preciousstones-repi</id>
+            <url>https://maven.elmakers.com/repository/</url>
+        </repository>
+        <repository>
+            <id>dynmap-repo</id>
+            <url>http://repo.mikeprimm.com/</url>
+        </repository>
+        <repository>
+            <id>simpleclans-repo</id>
+            <url>https://dl.bintray.com/roinujnosde/bukkit-plugins</url>
+        </repository>
     </repositories>
 
     <!-- Build -->
@@ -139,33 +151,28 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- MANUALLY BUILD THE PRECIOUSSTONES JAR -->
-        <!-- SYSTEM: PreciousStonesAPI -->
+        <!-- BUILD: PreciousStonesAPI -->
         <dependency>
             <groupId>net.sacredlabyrinth.Phaed</groupId>
             <artifactId>PreciousStones</artifactId>
-            <version>LATEST</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/PreciousStones-API.jar</systemPath>
+            <version>1.16.1.12</version>
+            <scope>provided</scope>
         </dependency>
 
-        <!-- MANUALLY BUILD THE DYNMAP-API JAR -->
-        <!-- SYSTEM: DynmapAPI -->
+        <!-- BUILD: DynmapAPI -->
         <dependency>
             <groupId>org.dynmap</groupId>
             <artifactId>dynmap-api</artifactId>
-            <version>LATEST</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/Dynmap-API.jar</systemPath>
+            <version>2.0</version>
+            <scope>provided</scope>
         </dependency>
 
-        <!-- MANUALLY BUILD THE SIMPLECLANS JAR -->
+        <!-- BUILD: SimpleClans -->
         <dependency>
             <groupId>net.sacredlabyrinth.phaed.simpleclans</groupId>
             <artifactId>SimpleClans</artifactId>
-            <version>LATEST</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/SimpleClans-API.jar</systemPath>
+            <version>2.14.5</version>
+            <scope>provided</scope>
         </dependency>
 
     </dependencies>
