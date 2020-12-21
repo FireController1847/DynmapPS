@@ -1,11 +1,14 @@
 package com.firecontroller1847.dynmapps;
 
+import com.firecontroller1847.dynmapps.command.CommandDynmapPS;
+import com.firecontroller1847.dynmapps.tabcompleter.TabCompleterDynmapPS;
 import net.sacredlabyrinth.Phaed.PreciousStones.PreciousStones;
 import net.sacredlabyrinth.Phaed.PreciousStones.field.Field;
 import net.sacredlabyrinth.Phaed.PreciousStones.managers.ForceFieldManager;
 import net.sacredlabyrinth.phaed.simpleclans.Clan;
 import net.sacredlabyrinth.phaed.simpleclans.SimpleClans;
 import org.bukkit.World;
+import org.bukkit.command.PluginCommand;
 import org.dynmap.DynmapAPI;
 import org.dynmap.markers.AreaMarker;
 import org.dynmap.markers.MarkerAPI;
@@ -18,6 +21,7 @@ import org.locationtech.jts.operation.union.UnaryUnionOp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 // TODO: Add reload command
 public class DynmapPS extends FirePlugin {
@@ -62,6 +66,11 @@ public class DynmapPS extends FirePlugin {
         }
         this.addLoop("update", updateLoopDelay * 1000, this::update);
 
+        // Register commands
+        PluginCommand cmdDynmapps = Objects.requireNonNull(this.getCommand("dynmapps"));
+        cmdDynmapps.setExecutor(new CommandDynmapPS());
+        cmdDynmapps.setTabCompleter(new TabCompleterDynmapPS());
+
         // We have loaded successfully
         return true;
     }
@@ -92,7 +101,7 @@ public class DynmapPS extends FirePlugin {
     }
 
     // Constructs all of the marker sets
-    private void createMarkerSets() {
+    public void createMarkerSets() {
         MarkerAPI markerApi = dynmapApi.getMarkerAPI();
 
         // Loop through all layers
@@ -121,7 +130,7 @@ public class DynmapPS extends FirePlugin {
 
     // Updates the markers and marker sets
     // This all happens on a different thread than the main server thread to prevent lag
-    private void update() {
+    public void update() {
         ForceFieldManager manager = preciousStones.getForceFieldManager();
         if (this.getConfig().getBoolean("debug")) {
             this.getLogger().info("Starting " + this.getName() + " rebuild...");

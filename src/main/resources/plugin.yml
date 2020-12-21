@@ -10,3 +10,38 @@ name: ${project.name}
 version: ${project.version}
 author: FireController#1847
 website: https://www.visualfiredev.com/
+
+# Commands
+commands:
+  dynmapps:
+    description: Lists all of the available commands for the plugin
+    usage: /dynmapps
+    aliases: [dps]
+    permission: dynmapps.command
+
+# Permissions
+permissions:
+  # Stars
+  dynmapps.*:
+    description: Gives permission to everything for DynmapPS
+    default: op
+    children:
+      dynmapps.command.*: true
+  dynmapps.command.*:
+    description: Gives permission to all DynmapPS commands
+    default: op
+    children:
+      dynmapps.command: true
+      dynmapps.command.reload: true
+      dynmapps.command.forceupdate: true
+
+  # Commands
+  dynmapps.command:
+    description: Gives permission to the main command
+    default: true
+  dynmapps.command.reload:
+    description: Gives permission to the reload command
+    default: op
+  dynmapps.command.forceupdate:
+    description: Gives permission to force a map update
+    default: op

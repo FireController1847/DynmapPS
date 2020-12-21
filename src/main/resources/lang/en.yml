@@ -10,5 +10,11 @@
 #   %clan_owner%: The name of the owner of the clan
 #   %clan_description%: The description of the clan
 #   %clan_member_count%: The amount of members in the clan
-prefix: "[§DynmapPS]"
+prefix: "[§bDynmapPS§r]"
 no_permission: "§cYou do not have permission to run this command!"
+config:
+  error: "%prefix% §cThere was an error loading the configuration!"
+  reloaded: "%prefix% Configuration reloaded!"
+forceupdate:
+  wait: "%prefix% Forcing an update, this may take a couple of seconds..."
+  complete: "%prefix% Updated!"
