@@ -48,6 +48,7 @@
                 </executions>
                 <configuration>
                     <outputFile>./target/${project.name}-${project.version}.jar</outputFile>
+                    <minimizeJar>true</minimizeJar>
                     <filters>
                         <filter>
                             <artifact>*:*</artifact>
