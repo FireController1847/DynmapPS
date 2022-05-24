@@ -202,7 +202,7 @@ public class DynmapPS extends FirePlugin {
                         finalName = ourLayer.getDisplay().getClanName()
                                 .replace("%clan%", clan.getName())
                                 .replace("%clan_owner%", clan.getLeaders().get(0).getCleanName())
-                                .replace("%clan_description%", clan.getDescription())
+                                .replace("%clan_description%", clan.getDescription() != null ? clan.getDescription() : "")
                                 .replace("%clan_tag%", clan.getTag())
                                 .replace("%clan_member_count%", String.valueOf(clan.getMembers().size()));
                     }
