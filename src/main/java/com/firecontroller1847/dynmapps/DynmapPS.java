@@ -200,6 +200,10 @@ public class DynmapPS extends FirePlugin {
                     // Set name
                     if (clan != null) {
                         finalName = ourLayer.getDisplay().getClanName()
+                                .replace("%id%", String.valueOf(field.getId()))
+                                .replace("%name%", field.getName())
+                                .replace("%owner%", field.getOwner())
+                                .replace("%title%", field.getSettings().getTitle())
                                 .replace("%clan%", clan.getName())
                                 .replace("%clan_owner%", clan.getLeaders().get(0).getCleanName())
                                 .replace("%clan_description%", clan.getDescription() != null ? clan.getDescription() : "")
