@@ -30,7 +30,7 @@
         </repository>
         <repository>
             <id>dynmap-repo</id>
-            <url>http://repo.mikeprimm.com/</url>
+            <url>https://repo.mikeprimm.com/</url>
         </repository>
         <repository>
             <id>roinujnosde-repo</id>
@@ -105,6 +105,7 @@
                             <goal>copy-resources</goal>
                         </goals>
                         <configuration>
+                            <!--suppress UnresolvedMavenProperty -->
                             <outputDirectory>${env.SERVER_DIRECTORY}\plugins</outputDirectory>
                             <encoding>UTF-8</encoding>
                             <resources>
