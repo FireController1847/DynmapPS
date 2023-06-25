@@ -2,6 +2,7 @@
 
 Show your PreciousStones on your Dynmap for your Minecraft server, with support for SimpleClans.
 
+[See this plugin on Hangar](https://hangar.papermc.io/FireController1847/DynmapPS/)  
 [See this plugin on SpigotMC](https://www.spigotmc.org/resources/dynmapps.86957/)
 
 ## Commands
